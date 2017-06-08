@@ -27,7 +27,7 @@ The file extension to be converted to. Keep in mind this only dictates the resul
 **bitrate=80000** (command line: -b,-bitrate)
 The bitrate to encode at in bits per second. If purge is not set to "only" this is a required setting. **(default = 80000)**
 
-**instances=** 0 to 25
+**instances=0 to 25**
 How many instances of ffprobe and ffmpeg to be able to run at once. Because many encoders are not multi-threaded in ffmpeg we can simply operate on several files at once to speed up the process. Setting this to 0 effectively pauses the scanning or converting loops. This setting can be modified during the sync using the ***up and down arrows*** **(default = 5)**
 
 **ffargs=additional arguments** (command line: a string contained in "" e.g. "-c:v copy -compression_level 10")
