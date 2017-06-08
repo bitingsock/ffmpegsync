@@ -6,7 +6,7 @@ The purpose of the conversion would typically be to have a smaller version of an
 
 # USAGE:
 
-ffmpegSync trys to read from a config file (named sync.config) in the directory from which it is run.
+ffmpegSync trys to read from a config file (named sync.config) in the directory from which it is run. If it is run with command line arguments they will overwrite any relevant option.
 The valid options it looks for are as follows:
 
 **purge=yes|no|only** *(optional)* (command line: -p,-purge)
