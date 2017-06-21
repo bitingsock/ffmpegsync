@@ -1,10 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Diagnostics;
-using System.Configuration;
 using System.IO;
 using System.Threading;
 
@@ -12,7 +9,6 @@ namespace ffmpegSync
 {
     class ffmpegSync
     {
-        static List<Process> ProcList = new List<Process>();
         static Dictionary<string, string> JobList = new Dictionary<string, string>();
         static int instances;
         static int bitrate;
@@ -107,7 +103,7 @@ namespace ffmpegSync
             }
             if (cfgsettings.ContainsKey("outputformat") && cfgsettings["outputformat"] != "")
             {
-                outputformat = cfgsettings["outputformat"];
+                outputformat = cfgsettings["outputformat"].ToLower();
             }
             else
             {
@@ -115,7 +111,7 @@ namespace ffmpegSync
             }
             if (cfgsettings.ContainsKey("inputformats") && cfgsettings["inputformats"] != "")
             {
-                inputformats = cfgsettings["inputformats"].Split(',');
+                inputformats = cfgsettings["inputformats"].ToLower().Split(',');
             }
             else if (purgesetting != "only")
             {
@@ -154,14 +150,11 @@ namespace ffmpegSync
             {
                 ffargs = cfgsettings["ffargs"];
             }
-
             if (purgesetting != "no")
             {
                 Console.WriteLine("purging faulty files...");
-
                 int scanned = 0;
                 int lastScanned = 0;
-                //Console.WriteLine("Faulty files deleted: " + deleted);
                 Dictionary<int, Thread> probeThreads = new Dictionary<int, Thread>();
                 while (scanned < dPaths.Count())
                 {
@@ -198,7 +191,6 @@ namespace ffmpegSync
                             default:
                                 break;
                         }
-
                         Console.SetCursorPosition(0, cursor);
                     }
                     List<int> threadsTemp = new List<int>();
@@ -226,25 +218,19 @@ namespace ffmpegSync
                         }
                     }
                     foreach (var file in dPaths)
-
                         if (probeThreads.Count < instances && File.Exists(file))
                         {
                             Thread t = new Thread(() => dPurge(file));
                             t.Start();
                             probeThreads.Add(t.ManagedThreadId, t);
                         }
-                    //Thread.Sleep(10);
                     if (scanned - lastScanned > 10)
                     {
                         Console.Write("\r");
                         Console.Write("Faulty files deleted: " + deleted + " of " + scanned + " scanned");
                         lastScanned = scanned;
-
                     }
                 }
-
-
-
                 dPaths = Directory.GetFileSystemEntries(destDir, "*", SearchOption.AllDirectories);
             }
             if (purgesetting == "only")
@@ -252,55 +238,45 @@ namespace ffmpegSync
                 Console.WriteLine("purge=only, exit");
                 return;
             }
-            Console.WriteLine("comparing files...");
-            var destRelDir = dPaths.Select(r => r.Replace(destDir, ""));
-            var sourceRelDir = sPaths.Select(r => r.Replace(sourceDir, ""));
-            var toDelete = destRelDir.Where(r => !sourceRelDir.Contains(r)).ToList();
-            foreach (var ext in inputformats)
+            Console.WriteLine("[1/4] comparing files...");
+            var destRelDir = dPaths.Select(r => r.Replace(destDir, "")).ToArray();
+            var sourceRelDir = sPaths.Select(r => r.Replace(sourceDir, "")).ToArray();
+            var sourceRelDirNoExt = new List<string>();
+            foreach (var sfile in sourceRelDir)
             {
-                toDelete.AddRange(destRelDir.Where(r => r.Contains("." + ext)));
+                var sfileExt = sfile.Substring(sfile.LastIndexOf('.') + 1);
+                var index = sfile.LastIndexOf(sfileExt);
+                if (index >= 0)
+                {
+                    sourceRelDirNoExt.Add(sfile.Substring(0, index));
+                }
             }
-
-            Console.WriteLine("[DELETING files not in source]:");
+            var toDelete = destRelDir.Where(r => !sourceRelDir.Contains(r)).ToList();
+            Console.WriteLine("[2/4] DELETING files not in source...");
             foreach (var dFile in toDelete)
             {
-                var dFileExt = dFile.Substring(dFile.LastIndexOf('.') + 1);
-                //var dFileNoExt = dFile.Replace(dFileExt, "");
+                var dFileExt = dFile.Substring(dFile.LastIndexOf('.') + 1).ToLower();
                 string dFileNoExt = "";
                 var index = dFile.LastIndexOf(dFileExt);
                 if (index >= 0)
                 {
                     dFileNoExt = dFile.Substring(0, index);
                 }
-                var delete = true;
-                foreach (var ext in inputformats)
+                if (File.Exists(destDir + dFile) && (outputformat != dFileExt || !sourceRelDirNoExt.Contains(dFileNoExt)))
                 {
-                    if (outputformat == dFileExt.ToLower() && (sourceRelDir.Contains(dFileNoExt + ext) || sourceRelDir.Contains(dFileNoExt + ext.ToUpper())))
-                    {
-                        delete = false;
-                    }
+                    File.Delete(destDir + dFile);
+                    Console.WriteLine("delete: " + dFile);
                 }
-                if (delete)
+                else if (Directory.Exists(destDir + dFile))
                 {
-                    try
-                    {
-                        if (File.Exists(destDir + dFile))
-                        {
-                            File.Delete(destDir + dFile);
-                            //Console.Write("\r");
-                            Console.WriteLine(dFile);
-                        }
-                    }
-                    catch (Exception delEx)
-                    {
-                        //Console.Write("\r");
-                        Console.Write("--Warning: Could not delete: " + dFile + " (" + delEx.Message + ")");
-                    }
+                    Directory.Delete(destDir + dFile, true);
+                    Console.WriteLine("delete: " + dFile);
                 }
             }
+            Console.WriteLine("[3/4] adding jobs and copying...");
             dPaths = Directory.GetFileSystemEntries(destDir, "*", SearchOption.AllDirectories);
-            destRelDir = dPaths.Select(r => r.Replace(destDir, ""));
-            var toConvert = sourceRelDir.Where(r => !destRelDir.Contains(r));
+            destRelDir = dPaths.Select(r => r.Replace(destDir, "")).ToArray();
+            var toConvert = sourceRelDir.Except(destRelDir);
             foreach (var sFile in toConvert)
             {
                 if (Directory.Exists(sourceDir + sFile))
@@ -310,7 +286,6 @@ namespace ffmpegSync
                 else
                 {
                     var sFileExt = sFile.Substring(sFile.LastIndexOf('.') + 1);
-                    //var sFileNoExt = sFile.Replace(sFileExt, "");
                     string sFileNoExt = "";
                     var index = sFile.LastIndexOf(sFileExt);
                     if (index >= 0)
@@ -319,7 +294,6 @@ namespace ffmpegSync
                     }
                     if (inputformats.Contains(sFileExt.ToLower()) && !destRelDir.Contains(sFileNoExt + outputformat))
                     {
-
                         JobList.Add(sourceDir + sFile, destDir + sFileNoExt + outputformat);
                         Console.WriteLine("Add job: " + sFile);
                     }
@@ -342,10 +316,10 @@ namespace ffmpegSync
             int completeJobs = 0;
             int lastinstances = instances;
             Dictionary<int, Thread> threads = new Dictionary<int, Thread>();
+            Console.WriteLine("[4/4] converting...");
             while (JobList.Count > 0 || threads.Count > 0)
             {
-                //button HOOK
-                if (Console.KeyAvailable)
+                if (Console.KeyAvailable)//button HOOK
                 {
                     ConsoleKeyInfo key = Console.ReadKey();
                     switch (key.Key)
@@ -403,7 +377,9 @@ namespace ffmpegSync
                 }
                 Thread.Sleep(10);
             }
-            Console.WriteLine("All conversions complete!!!");
+            Console.WriteLine("All conversions/transfers complete.");
+            Console.WriteLine("Press any key to exit");
+            Console.ReadKey();
         }
         static Dictionary<string, string> GetConfigValues(string inCFGFilePath)
         {
@@ -418,18 +394,14 @@ namespace ffmpegSync
         }
         static Boolean dPurge(string path)
         {
-            //string retMessage = String.Empty;
             Process p = new Process();
             ProcessStartInfo startInfo = new ProcessStartInfo();
-            //startInfo.CreateNoWindow = true;
             startInfo.RedirectStandardError = true;
             startInfo.UseShellExecute = false;
             startInfo.Arguments = "-loglevel 24 " + "\"" + path + "\"";
             startInfo.FileName = "ffprobe.exe";
             p.StartInfo = startInfo;
             p.Start();
-            StreamReader sr = p.StandardError;
-            //Console.WriteLine(sr.ReadLine());
             string Err = p.StandardError.ReadToEnd();
             if (Err != "")
             {
@@ -457,7 +429,6 @@ namespace ffmpegSync
             Process p = new Process();
             ProcessStartInfo startInfo = new ProcessStartInfo();
             startInfo.CreateNoWindow = true;
-            //startInfo.RedirectStandardError = true;
             startInfo.UseShellExecute = false;
             var job = JobList.First();
             string argu = "";
