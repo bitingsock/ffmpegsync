@@ -15,7 +15,7 @@ Tells ffmpegSync if it should look for faulty files in the destination directory
 **source=DirectoryA** (command line: -s,-source)
 The directory containing files to be copied to the new destination. If purge is not set to "only" this is a required setting.
 
-**destination=DirectoryA** (command line: -d,-destination)
+**destination=DirectoryB** (command line: -d,-destination)
 The directory to contain converted and copied files.
 
 **inputformats=flac**(command line: -i, -inputformats)
